@@ -90,29 +90,36 @@ impl Parser {
 	}
 
 	fn addition(&mut self) -> Time {
-		let first = self.time();
+		let mut first = self.time();
 
 		//Reached end
 		if self.current >= self.tokens.len() {
 			return first;
 		}
 
-		match current!(self) {
-			Token::Keyword(keyword) => {
-				if keyword == "and" {
-					advance!(self);
-					let second = self.time();
-					if let Some(total) = first.checked_add(second) {
-						return total;
+		loop {
+			match current!(self) {
+				Token::Keyword(keyword) => {
+					if keyword == "and" {
+						advance!(self);
+						let second = self.time();
+						if let Some(total) = first.checked_add(second) {
+							first = total;
+							if next!(self).is_none() {
+								break;
+							}
+						} else {
+							panic!();
+						}
 					} else {
-						panic!();
+						break;
 					}
-				} else {
-					return first;
-				}
-			},
-			_ => return first
+				},
+				_ => break
+			}
 		}
+
+		return first;
 	}
 
 	fn time(&mut self) -> Time {
