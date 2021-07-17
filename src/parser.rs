@@ -17,12 +17,15 @@ And the lower precedence time expressions (which return a time)
 */
 
 /*
-expression -> addition
+date_expression -> (time_expression ("before" | "after"))? date
+date -> ((nth day)? (month)? (year)?) | weekday
+time_expression -> addition
 addition -> time ("and" time)*
 time -> number unit
 */
 
 type Time = std::time::Duration;
+type Date = std::time::SystemTime;
 
 static SECONDS_LOOKUP: [(&'static str, u64); 7] = [
 	("seconds", 1),
@@ -48,7 +51,11 @@ pub fn parse(tokens: Vec<Token>) {
 		current: 0
 	};
 
-	parser.parse();
+	let date = parser.parse();
+	match date {
+		Some(date) => println!("{:?}", date.duration_since(Date::UNIX_EPOCH).unwrap().as_secs()),
+		_ => println!("error")
+	}
 }
 
 macro_rules! current {
@@ -78,15 +85,14 @@ enum Node {
 
 impl Parser {
 
-	fn parse(&mut self) -> Node{
-		self.expression()
+	fn parse(&mut self) -> Option<Date> {
+		let duration = self.time_expression();
+		let now = Date::now();
+		return now.checked_add(duration)
 	}
 
-	fn expression(&mut self) -> Node {
-		
-		println!("{:?}", self.addition());
-		self.current = 0;
-		Node::Time(self.addition())
+	fn time_expression(&mut self) -> Time {
+		self.addition()
 	}
 
 	fn addition(&mut self) -> Time {
