@@ -4,27 +4,32 @@ use crate::lexer::Token;
 
 /*
 
-We have 2 primitives
-Time: "3 hours" or "2 minutes"
-Date: "23 januari" or "tuesday"
+We have 3 types
+duration: "3 hours" or "2 minutes"
+date: "23 januari" or "tuesday"
+datetime: "friday at 02:00" or "7 march 2008 at 06:00"
+time: "22:00" or "01:25"
 
 We have the higher precedence date expressions (which return a date)
-<time> before <date>
-<time> after <date>
+<duration> before <datetime>
+<duration> after <datetime>
 
 And the lower precedence time expressions (which return a time)
-<time> and <time>
+<duration> and <duration>
 */
 
 /*
-date_expression -> (time_expression ("before" | "after"))? date
-date -> ((nth day)? (month)? (year)?) | weekday
-time_expression -> addition
-addition -> time ("and" time)*
-time -> number unit
+datetime_expression -> (duration_expression ("before" | "after"))? datetime
+datetime -> date ("at" time)?
+time -> hh:mm
+date -> ((n day)? (month)? (year)?) | weekday
+duration_expression -> addition
+addition -> duration ("and" duration)*
+duration -> n unit
+unit -> "seconds" | "minutes" | "hours" | "days" | "weeks" | "months" | "years"
 */
 
-type Time = std::time::Duration;
+type Duration = std::time::Duration;
 type Date = std::time::SystemTime;
 
 static SECONDS_LOOKUP: [(&'static str, u64); 7] = [
@@ -80,23 +85,23 @@ macro_rules! advance {
 }
 
 enum Node {
-	Time(Time),
+	Duration(Duration),
 }
 
 impl Parser {
 
 	fn parse(&mut self) -> Option<Date> {
-		let duration = self.time_expression();
+		let duration = self.duration_expression();
 		let now = Date::now();
 		return now.checked_add(duration)
 	}
 
-	fn time_expression(&mut self) -> Time {
+	fn duration_expression(&mut self) -> Duration {
 		self.addition()
 	}
 
-	fn addition(&mut self) -> Time {
-		let mut first = self.time();
+	fn addition(&mut self) -> Duration {
+		let mut first = self.duration();
 
 		//Reached end
 		if self.current >= self.tokens.len() {
@@ -108,7 +113,7 @@ impl Parser {
 				Token::Keyword(keyword) => {
 					if keyword == "and" {
 						advance!(self);
-						let second = self.time();
+						let second = self.duration();
 						if let Some(total) = first.checked_add(second) {
 							first = total;
 							if next!(self).is_none() {
@@ -128,7 +133,7 @@ impl Parser {
 		return first;
 	}
 
-	fn time(&mut self) -> Time {
+	fn duration(&mut self) -> Duration {
 
 		if let Token::Number(number) = current!(self) {
 			
@@ -144,7 +149,7 @@ impl Parser {
 				if let Some(lkp) = SECONDS_LOOKUP.iter().find(|lkp| lkp.0 == unit) {
 					let seconds = lkp.1 * number as u64;
 					
-					return Time::new(seconds, 0);
+					return Duration::new(seconds, 0);
 				} else {
 					panic!("Invalid unit")
 				}
